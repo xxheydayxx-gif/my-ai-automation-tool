@@ -1,0 +1,15 @@
+{
+  "name": "contract-ax-desk",
+  "version": "0.1.0",
+  "private": true,
+  "description": "준정부기관 계약AX Desk 로컬 실증 웹앱",
+  "scripts": {
+    "dev": "node server.js",
+    "start": "node server.js",
+    "test": "node --check server.js && node --check public/app.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
+
