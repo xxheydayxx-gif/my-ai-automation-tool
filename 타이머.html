@@ -1,0 +1,1033 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>REFERENCE HRD - 쉬는 시간 타이머</title>
+    <!-- Tailwind CSS 탑재: 반응형 및 프리미엄 스타일 구현을 위한 최신 스타일시트 라이브러리 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* 대형 빔프로젝터용 고가독성 명품 폰트 5종 사전 로드 */
+        @import url('https://fonts.googleapis.com/css2?family=Gmarket+Sans:wght@300;500;700&family=JetBrains+Mono:wght@400;700;800&family=Share+Tech+Mono&family=Black+Han+Sans&family=Outfit:wght@400;700;900&display=swap');
+        
+        body {
+            font-family: 'Gmarket Sans', sans-serif;
+            transition: background 0.8s ease, color 0.8s ease;
+        }
+        
+        /* [폰트 스타일 옵션별 클래스 세팅] */
+        .font-jetbrains { font-family: 'JetBrains Mono', monospace; }
+        .font-digital { font-family: 'Share Tech Mono', monospace; }
+        .font-impact { font-family: 'Black Han Sans', sans-serif; }
+        .font-gmarket { font-family: 'Gmarket Sans', sans-serif; }
+        .font-outfit { font-family: 'Outfit', sans-serif; }
+        
+        /* 부드러운 인터랙션 애니메이션 */
+        .smooth-transition {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        /* 컨트롤 패널 내부 스크롤바 커스텀 */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.4);
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between overflow-hidden relative select-none bg-slate-950">
+
+    <!-- [배경 시스템]: 이미지와 그라데이션 레이어의 조화로운 블렌딩 -->
+    <!-- 1. 고화질 웹 이미지 레이어 -->
+    <div id="bgImage" class="absolute inset-0 bg-cover bg-center transition-all duration-1000 opacity-0 -z-30 scale-105"></div>
+    
+    <!-- 2. 가독성 확보를 위한 반투명 차광 필터 (빔프로젝터 투사 시 텍스트 왜곡 방지) -->
+    <div class="absolute inset-0 bg-slate-950/50 -z-20"></div>
+
+    <!-- 3. 테마 컬러의 은은한 감성을 더해주는 오버레이 그라데이션 -->
+    <div class="absolute inset-0 bg-gradient-to-tr opacity-80 mix-blend-multiply transition-all duration-1000 -z-10" id="bgGradient"></div>
+
+    <!-- [상단 헤더]: 현재 상태 및 타이머 안내 표시 -->
+    <header class="w-full px-8 py-6 flex justify-between items-center z-10">
+        <div class="flex items-center space-x-3">
+            <!-- 시각적 포인트를 더해주는 심볼 마크 -->
+            <div class="w-3 h-8 bg-emerald-400 rounded-full animate-pulse" id="themeIndicator"></div>
+            <div>
+                <h1 class="text-xs uppercase tracking-widest font-bold text-gray-400">REST & RECHARGE</h1>
+                <p class="text-sm font-medium text-white/80" id="currentThemeName">클래식 에듀 (Classic Navy)</p>
+            </div>
+        </div>
+        
+        <!-- 실시간 시계 표시 (타이머와 별개로 현재 시간을 항상 인지할 수 있도록 배치) -->
+        <div class="text-right">
+            <span class="text-xs text-gray-400 uppercase tracking-wider block">현재 시각</span>
+            <span class="text-lg font-bold text-white/90 font-jetbrains" id="liveClock">00:00:00</span>
+        </div>
+    </header>
+
+    <!-- [메인 영역]: 타이머 & 메시지 영역 -->
+    <main class="flex-grow flex flex-col justify-center items-center px-4 z-10">
+        <!-- 1. 타이머 진행률을 은은하게 보여주는 프로그레스 바 -->
+        <div class="w-full max-w-4xl h-1.5 bg-white/10 rounded-full overflow-hidden mb-8">
+            <div class="h-full bg-emerald-400 w-full smooth-transition" id="progressBar"></div>
+        </div>
+
+        <!-- 2. 초대형 타이머 디스플레이 (선택된 가독성 폰트가 동적으로 입혀지는 곳) -->
+        <div class="relative flex items-center justify-center">
+            <div class="text-[12vw] sm:text-[14vw] md:text-[16vw] font-extrabold tracking-tight leading-none transition-all duration-300 text-white drop-shadow-[0_10px_10px_rgba(0,0,0,0.8)] font-jetbrains" id="timerDisplay">
+                10:00
+            </div>
+            <!-- 일시정지 상태일 때 시각적인 깜빡임 효과 제공 -->
+            <div class="absolute -top-4 right-0 bg-amber-500 text-slate-950 text-xs px-2.5 py-1 rounded-full font-bold uppercase tracking-wider hidden" id="pauseBadge">
+                PAUSED
+            </div>
+        </div>
+
+        <!-- 3. 실시간 강사 메시지 보드 (대형 교육장에서도 선명하게 보이도록 배색 처리) -->
+        <div class="mt-8 text-center max-w-5xl px-8 py-5 rounded-2xl bg-slate-950/40 border border-white/10 backdrop-blur-md smooth-transition shadow-2xl" id="messageBoardContainer">
+            <p class="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-medium tracking-wide text-white leading-relaxed" id="messageDisplay">
+                잠시 휴식을 취한 후, 정각에 다음 세션을 시작하겠습니다.
+            </p>
+        </div>
+    </main>
+
+    <!-- [하단 푸터 및 제어 영역] -->
+    <footer class="w-full px-8 py-6 z-10 flex flex-col md:flex-row justify-between items-center gap-4">
+        <!-- 푸터 고정 저작권 문구 (REFERENCE HRD 요구사항 준수) -->
+        <div class="text-xs text-white/40 font-medium tracking-wide">
+            © 2026 REFERENCE HRD. All Rights Reserved.
+        </div>
+
+        <!-- 플로팅 컨트롤 콘솔 및 최소화 버튼 토글 -->
+        <div class="flex items-center space-x-3">
+            <button onclick="toggleControlPanel()" class="flex items-center space-x-2 px-4 py-2 bg-slate-900/80 hover:bg-slate-800 text-white text-xs font-semibold rounded-lg border border-white/10 transition-all cursor-pointer shadow-lg hover:border-emerald-500/50" title="관리 메뉴 열기/닫기">
+                <svg id="toggleIconEye" class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                <span id="toggleText" class="text-emerald-300">설정 콘솔 열기</span>
+            </button>
+        </div>
+    </footer>
+
+    <!-- [컨트롤러 패널 모달]: 시간을 세팅하고 테마, 고화질 이미지 배경, 메시지, 폰트 설정을 제어하는 대시보드 -->
+    <div id="controlPanel" class="fixed bottom-24 left-1/2 -translate-x-1/2 w-[95%] max-w-6xl p-6 rounded-3xl backdrop-blur-2xl border transition-all duration-500 z-50 shadow-2xl block" style="background-color: rgba(10, 15, 30, 0.96); border-color: rgba(255, 255, 255, 0.1);">
+        
+        <!-- [신규]: 콘솔 창 우측 상단 X 닫기 버튼 -->
+        <button onclick="toggleControlPanel()" class="absolute top-4 right-4 text-white/50 hover:text-white transition p-2 hover:bg-white/10 rounded-full cursor-pointer z-50" title="콘솔 닫기">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+        </button>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            
+            <!-- [1단]: 타이머 제어 및 세밀화 디스플레이 옵션 -->
+            <div class="space-y-4 border-b lg:border-b-0 lg:border-r border-white/10 pb-6 lg:pb-0 lg:pr-6">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-sm font-bold text-emerald-400 flex items-center gap-2">
+                        ⏱️ 타이머 설정 및 퀵 제어
+                    </h3>
+                    <!-- 음소거 토글 -->
+                    <button onclick="toggleSound()" id="soundBtn" class="mr-6 p-1.5 rounded bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 transition" title="종료 벨소리 켜기/끄기">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" id="soundIcon"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"/></svg>
+                    </button>
+                </div>
+
+                <!-- 퀵 설정 버튼 (자주 쓰는 분 설정) -->
+                <div class="grid grid-cols-4 gap-2">
+                    <button onclick="setPresetTime(5)" class="py-2.5 bg-white/5 hover:bg-white/15 hover:border-emerald-500/30 text-white rounded-xl text-xs font-bold transition active:scale-95 border border-white/5">5분</button>
+                    <button onclick="setPresetTime(10)" class="py-2.5 bg-white/5 hover:bg-white/15 hover:border-emerald-500/30 text-white rounded-xl text-xs font-bold transition active:scale-95 border border-white/5">10분</button>
+                    <button onclick="setPresetTime(15)" class="py-2.5 bg-white/5 hover:bg-white/15 hover:border-emerald-500/30 text-white rounded-xl text-xs font-bold transition active:scale-95 border border-white/5">15분</button>
+                    <button onclick="setPresetTime(20)" class="py-2.5 bg-white/5 hover:bg-white/15 hover:border-emerald-500/30 text-white rounded-xl text-xs font-bold transition active:scale-95 border border-white/5">20분</button>
+                </div>
+
+                <!-- 수동 정밀 조절부 -->
+                <div class="bg-white/5 p-3 rounded-xl border border-white/5 space-y-3">
+                    <div class="flex items-center justify-between gap-2">
+                        <div class="flex items-center space-x-1.5">
+                            <input type="number" id="inputMin" value="10" min="0" max="999" class="w-12 bg-slate-950 text-white rounded py-1 text-center text-sm font-bold border border-white/10 focus:outline-none focus:border-emerald-400">
+                            <span class="text-xs text-white/60">분</span>
+                            <input type="number" id="inputSec" value="0" min="0" max="59" class="w-12 bg-slate-950 text-white rounded py-1 text-center text-sm font-bold border border-white/10 focus:outline-none focus:border-emerald-400">
+                            <span class="text-xs text-white/60">초</span>
+                        </div>
+                        <button onclick="applyManualTime()" class="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold rounded-lg transition">변경 적용</button>
+                    </div>
+                    <div class="flex justify-between gap-2">
+                        <button onclick="adjustTime(-60)" class="flex-1 py-1.5 bg-white/5 hover:bg-white/10 text-white text-xs rounded-lg font-medium border border-white/5">- 1분</button>
+                        <button onclick="adjustTime(60)" class="flex-1 py-1.5 bg-white/5 hover:bg-white/10 text-white text-xs rounded-lg font-medium border border-white/5">+ 1분</button>
+                    </div>
+                </div>
+
+                <!-- 디스플레이 세부 제어 콘솔 (폰트 & 밀리초 조절기) -->
+                <div class="bg-white/5 p-3.5 rounded-xl border border-white/5 space-y-3.5">
+                    <h4 class="text-xs font-bold text-teal-400">⚙️ 디스플레이 고급 설정</h4>
+                    
+                    <!-- 1. 폰트 변경 인터페이스 -->
+                    <div class="space-y-1">
+                        <label class="text-[10px] text-white/50 block">빔프로젝터 송출용 폰트 스타일</label>
+                        <select id="fontSelect" onchange="changeFont(this.value)" class="w-full bg-slate-950 text-white rounded-lg py-1.5 px-2.5 text-xs border border-white/10 focus:outline-none focus:border-emerald-400 cursor-pointer">
+                            <option value="0">JetBrains Mono (코딩/일정한 숫자폭)</option>
+                            <option value="1">Share Tech Mono (감각적 디지털)</option>
+                            <option value="2">Black Han Sans (웅장한 굵은 한글)</option>
+                            <option value="3">Gmarket Sans (정석적인 고딕)</option>
+                            <option value="4">Outfit (트렌디 둥근 폰트)</option>
+                        </select>
+                    </div>
+
+                    <!-- 2. 소수점 밀리초 토글 버튼 -->
+                    <div class="grid grid-cols-1">
+                        <button id="msToggleBtn" onclick="toggleMillisecondsBtn()" class="w-full py-2 bg-white/5 hover:bg-white/10 text-white text-xs rounded-lg font-medium border border-white/5 flex items-center justify-center gap-2 transition active:scale-95">
+                            <span id="msIndicator" class="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse"></span>
+                            <span id="msToggleText">소수점 (0.00초) 활성화</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 실행 제어 패널 -->
+                <div class="grid grid-cols-3 gap-2 pt-1">
+                    <button onclick="startTimer()" id="startBtn" class="py-3 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold rounded-xl text-sm transition active:scale-95 shadow-lg flex items-center justify-center gap-1">
+                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"/></svg>시작
+                    </button>
+                    <button onclick="pauseTimer()" id="pauseBtn" class="py-3 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-xl text-sm transition active:scale-95 flex items-center justify-center gap-1">
+                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM7 8a1 1 0 012 0v4a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v4a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>정지
+                    </button>
+                    <button onclick="resetTimer()" class="py-3 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-xl text-sm transition active:scale-95 flex items-center justify-center gap-1">
+                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 110 2H4a1 1 0 01-1-1V3a1 1 0 011-1z" clip-rule="evenodd"/></svg>리셋
+                    </button>
+                </div>
+            </div>
+
+            <!-- [2단]: 안내 메시지 설정 (수정 및 동적 등록 관리 시스템) -->
+            <div class="space-y-4 border-b lg:border-b-0 lg:border-r border-white/10 pb-6 lg:pb-0 lg:px-6">
+                <h3 class="text-sm font-bold text-emerald-400 flex items-center gap-2">
+                    💬 실시간 휴식 안내 메시지 설정
+                </h3>
+                
+                <!-- 커스텀 메시지 키보드 직접 입력 및 [프리셋 등록] 확장 -->
+                <div class="flex gap-2">
+                    <input type="text" id="inputMessage" placeholder="메시지를 입력 후 우측 버튼으로 저장" class="flex-grow bg-slate-950 text-white rounded-xl py-2.5 px-3.5 text-sm border border-white/10 focus:outline-none focus:border-emerald-400" onkeyup="updateLiveMessage(this.value)">
+                    <button onclick="addNewPreset()" class="px-3 bg-emerald-500 hover:bg-emerald-400 text-slate-950 rounded-xl text-xs font-bold transition whitespace-nowrap active:scale-95" title="작성한 텍스트를 메시지 프리셋 목록에 추가">
+                        프리셋 등록
+                    </button>
+                </div>
+
+                <div class="flex items-center justify-between">
+                    <span class="text-xs text-white/50">등록된 프리셋 목록 (클릭 시 전송 / 마우스 호버 시 삭제 가능)</span>
+                </div>
+
+                <!-- 자주 쓰는 대표 추천 메시지 동적 컨테이너 -->
+                <div class="space-y-1.5 max-h-[300px] overflow-y-auto pr-1 custom-scrollbar" id="presetMessageContainer">
+                    <!-- 자바스크립트를 통해 동적으로 관리 및 드로잉 되는 영역 -->
+                </div>
+            </div>
+
+            <!-- [3단]: 테마 그라데이션, 이미지 선택 및 실시간 디자인 미니 프리뷰 -->
+            <div class="space-y-4 lg:pl-6 max-h-[460px] overflow-y-auto pr-1 custom-scrollbar">
+                <!-- 1. 기본 그라데이션 컬러 테마 -->
+                <div>
+                    <h3 class="text-sm font-bold text-emerald-400 mb-2">🎨 그라데이션 컬러 필터</h3>
+                    <div class="grid grid-cols-5 gap-1.5" id="themeContainer">
+                        <!-- 자바스크립트에서 자동으로 마운트됩니다 -->
+                    </div>
+                </div>
+
+                <!-- 2. 배경 이미지 샘플 10선 -->
+                <div>
+                    <div class="flex items-center justify-between mb-2">
+                        <h3 class="text-sm font-bold text-emerald-400">🖼️ 고화질 감성 배경 (10선)</h3>
+                        <button onclick="clearBackgroundImage()" class="text-[10px] bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 px-2 py-0.5 rounded border border-rose-500/20 transition">이미지 제거</button>
+                    </div>
+                    <div class="grid grid-cols-5 gap-1.5" id="bgImageSelectorContainer">
+                        <!-- 이미지 프리셋 10개가 동적 렌더링됩니다 -->
+                    </div>
+                </div>
+
+                <!-- 3. [신규]: 실시간 디자인 미니 프리뷰 (Mini Preview) -->
+                <div class="pt-2 border-t border-white/10">
+                    <h3 class="text-sm font-bold text-teal-400 mb-2 flex items-center gap-1.5">
+                        🖥️ 실시간 미니 미리보기 (Mini Preview)
+                    </h3>
+                    <div id="miniPreviewCard" class="w-full h-32 rounded-xl overflow-hidden relative flex flex-col justify-between p-3 bg-cover bg-center border border-white/10 shadow-inner select-none transition-all duration-300">
+                        <!-- 미니 차광 필터 레이어 -->
+                        <div class="absolute inset-0 bg-slate-950/40 -z-20"></div>
+                        <!-- 미니 테마 컬러 오버레이 -->
+                        <div id="miniPreviewGrad" class="absolute inset-0 bg-gradient-to-tr opacity-80 mix-blend-multiply -z-10 transition-all duration-500"></div>
+
+                        <!-- 헤더 정보 영역 -->
+                        <div class="z-10 flex justify-between items-center text-[7px] text-white/60 tracking-wider">
+                            <span id="miniPreviewThemeName" class="truncate max-w-[70%]">Theme</span>
+                            <span id="miniPreviewClock" class="font-jetbrains">00:00:00</span>
+                        </div>
+
+                        <!-- 타이머 텍스트 미리보기 -->
+                        <div class="z-10 text-center my-auto">
+                            <div id="miniPreviewTimer" class="text-2xl font-black text-white tracking-tight leading-none drop-shadow-md">
+                                10:00
+                            </div>
+                        </div>
+
+                        <!-- 안내 메시지 미리보기 -->
+                        <div class="z-10 bg-slate-950/50 rounded-lg p-1 border border-white/5 max-w-[95%] mx-auto text-center truncate">
+                            <p id="miniPreviewMsg" class="text-[7px] text-white/90 leading-tight">
+                                잠시 휴식을 취한 후, 정각에 다음 세션을 시작하겠습니다.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        /*
+         * ==========================================
+         * 1. 프리미엄 컬러 테마 프리셋 설정
+         * ==========================================
+         */
+        const themes = [
+            {
+                name: "클래식 에듀 (Classic Navy)",
+                gradFrom: "#0f172a", // Slate 900
+                gradTo: "#1e3a8a",   // Blue 950
+                indicatorColor: "#34d399", // Emerald 400
+                fontColor: "text-white",
+                textColor: "text-slate-200"
+            },
+            {
+                name: "내추럴 테라피 (Natural Green)",
+                gradFrom: "#064e3b", // Emerald 950
+                gradTo: "#1c1917",   // Stone 900
+                indicatorColor: "#a7f3d0", // Emerald 200
+                fontColor: "text-emerald-100",
+                textColor: "text-stone-300"
+            },
+            {
+                name: "모던 비비드 (Modern Purple)",
+                gradFrom: "#3b0764", // Purple 950
+                gradTo: "#0f172a",   // Slate 950
+                indicatorColor: "#f472b6", // Pink 400
+                fontColor: "text-fuchsia-100",
+                textColor: "text-purple-200"
+            },
+            {
+                name: "선셋 워크숍 (Sunset Warmth)",
+                gradFrom: "#78350f", // Amber 950
+                gradTo: "#450a0a",   // Red 950
+                indicatorColor: "#fbbf24", // Amber 400
+                fontColor: "text-amber-100",
+                textColor: "text-orange-200"
+            },
+            {
+                name: "젠 다크 (Meditation Dark)",
+                gradFrom: "#0a0a0a", // Neutral 950
+                gradTo: "#171717",   // Neutral 900
+                indicatorColor: "#f59e0b", // Amber 500
+                fontColor: "text-amber-500",
+                textColor: "text-neutral-400"
+            }
+        ];
+
+        /*
+         * ==========================================
+         * 2. 가독성을 더해줄 사용 가능한 5대 타이머 폰트 라이브러리
+         * ==========================================
+         */
+        const fonts = [
+            { name: "JetBrains Mono", class: "font-jetbrains" },
+            { name: "Share Tech Mono", class: "font-digital" },
+            { name: "Black Han Sans", class: "font-impact" },
+            { name: "Gmarket Sans", class: "font-gmarket" },
+            { name: "Outfit", class: "font-outfit" }
+        ];
+
+        /*
+         * ==========================================
+         * 3. 릴랙세이션 고화질 웹 배경 이미지 프리셋 (10선)
+         * ==========================================
+         */
+        const backgroundImages = [
+            {
+                title: "숲속 길",
+                url: "https://images.unsplash.com/photo-1448375240586-882707db888b?auto=format&fit=crop&w=1200&q=80",
+                thumbnail: "https://images.unsplash.com/photo-1448375240586-882707db888b?auto=format&fit=crop&w=120&q=50"
+            },
+            {
+                title: "잔잔한 해변",
+                url: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1200&q=80",
+                thumbnail: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=120&q=50"
+            },
+            {
+                title: "아늑한 북카페",
+                url: "https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?auto=format&fit=crop&w=1200&q=80",
+                thumbnail: "https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?auto=format&fit=crop&w=120&q=50"
+            },
+            {
+                title: "고요한 우주",
+                url: "https://images.unsplash.com/photo-1506318137071-a8e063b4bec0?auto=format&fit=crop&w=1200&q=80",
+                thumbnail: "https://images.unsplash.com/photo-1506318137071-a8e063b4bec0?auto=format&fit=crop&w=120&q=50"
+            },
+            {
+                title: "도서관",
+                url: "https://images.unsplash.com/photo-1521587760476-6c12a4b040da?auto=format&fit=crop&w=1200&q=80",
+                thumbnail: "https://images.unsplash.com/photo-1521587760476-6c12a4b040da?auto=format&fit=crop&w=120&q=50"
+            },
+            {
+                title: "싱그러운 정원",
+                url: "https://images.unsplash.com/photo-1447752875215-b2761acb3c5d?auto=format&fit=crop&w=1200&q=80",
+                thumbnail: "https://images.unsplash.com/photo-1447752875215-b2761acb3c5d?auto=format&fit=crop&w=120&q=50"
+            },
+            {
+                title: "몽환적인 하늘",
+                url: "https://images.unsplash.com/photo-1483728642387-6c3bdd6c93e5?auto=format&fit=crop&w=1200&q=80",
+                thumbnail: "https://images.unsplash.com/photo-1483728642387-6c3bdd6c93e5?auto=format&fit=crop&w=120&q=50"
+            },
+            {
+                title: "아침 햇살",
+                url: "https://images.unsplash.com/photo-1470252649378-9c29740c9fa8?auto=format&fit=crop&w=1200&q=80",
+                thumbnail: "https://images.unsplash.com/photo-1470252649378-9c29740c9fa8?auto=format&fit=crop&w=120&q=50"
+            },
+            {
+                title: "조용한 도시",
+                url: "https://images.unsplash.com/photo-1477959858617-67f85cf4f1df?auto=format&fit=crop&w=1200&q=80",
+                thumbnail: "https://images.unsplash.com/photo-1477959858617-67f85cf4f1df?auto=format&fit=crop&w=120&q=50"
+            },
+            {
+                title: "창가 빗방울",
+                url: "https://images.unsplash.com/photo-1433832597046-4f10e10ac764?auto=format&fit=crop&w=1200&q=80",
+                thumbnail: "https://images.unsplash.com/photo-1433832597046-4f10e10ac764?auto=format&fit=crop&w=120&q=50"
+            }
+        ];
+
+        /*
+         * ==========================================
+         * 4. [신규]: 휴식 메시지 프리셋 동적 상태 보관 배열
+         * ==========================================
+         */
+        let messagePresets = [
+            "잠시 휴식을 취한 후, 정각에 다음 세션을 시작하겠습니다.",
+            "자유로운 네트워킹과 따뜻한 소통을 위한 휴식 시간입니다.",
+            "교육장 뒤편에 신선한 다과와 따뜻한 음료가 준비되어 있습니다.",
+            "자리에 돌아오셔서 다음 학습을 위해 노트북 전원을 연결해주세요."
+        ];
+
+        /*
+         * ==========================================
+         * 5. 전역 상태 변수 관리
+         * ==========================================
+         */
+        let currentThemeIndex = 0;
+        let currentFontIndex = 0; // 초기 디폴트: 0 (JetBrains Mono)
+        let selectedBgIndex = -1;  // 선택 배경 상태값 (-1은 없음)
+        
+        let timeLeftMs = 600000;    // 밀리초 기준 디폴트 시간: 10분 (600,000ms)
+        let totalDurationMs = 600000;
+        let targetTime = 0;         // 타이머 종료 예정 절대 시각(Date.now() 기준)
+        
+        let timerFrameId = null;    // requestAnimationFrame 핸들러
+        let isRunning = false;      // 타이머 상태 논리 플래그
+        let isSoundOn = true;       // 벨소리 온오프 제어
+        let showMilliseconds = false; // 소수점 0.00초 표시 플래그
+        let alarmInterval = null;   // 타임아웃 경보 점멸 애니메이션 핸들러
+
+        /*
+         * ==========================================
+         * 6. 타이머 초기화 및 구동 엔진
+         * ==========================================
+         */
+        window.onload = function() {
+            renderThemeSelector();
+            renderBgImageSelector();
+            renderMessagePresets(); // 동적 프리셋 렌더링 추가
+            applyTheme(0);
+            changeFont(0); // 초기 기본 폰트 주입
+            updateTimerDisplay();
+            startLiveClock();
+            
+            // 초기 추천 알림 메시지 기본 매칭
+            document.getElementById('inputMessage').value = "잠시 휴식을 취한 후, 정각에 다음 세션을 시작하겠습니다.";
+            updateLiveMessage("잠시 휴식을 취한 후, 정각에 다음 세션을 시작하겠습니다.");
+            
+            // 첫 진입 시 컨트롤 패널이 열려있도록 세팅
+            const panel = document.getElementById('controlPanel');
+            panel.classList.remove('hidden');
+            panel.classList.add('block');
+            document.getElementById('toggleText').innerText = "설정 콘솔 숨기기";
+        };
+
+        // 소수점 표시 스위칭 시 실시간 텍스트 및 오버레이 스케일 유연 보정
+        function updateTimerDisplay() {
+            let displayStr = "";
+            const displayElement = document.getElementById('timerDisplay');
+            const miniPreviewTimer = document.getElementById('miniPreviewTimer');
+
+            if (showMilliseconds) {
+                // MM:SS.CC (분:초.소수점두자리) 정밀 연산
+                const minutes = Math.floor(timeLeftMs / 60000);
+                const seconds = Math.floor((timeLeftMs % 60000) / 1000);
+                const centiseconds = Math.floor((timeLeftMs % 1000) / 10);
+                
+                const displayMin = String(minutes).padStart(2, '0');
+                const displaySec = String(seconds).padStart(2, '0');
+                const displayCenti = String(centiseconds).padStart(2, '0');
+                
+                displayStr = `${displayMin}:${displaySec}.${displayCenti}`;
+                
+                // 밀리초가 보일 때는 한 줄에 부드럽게 감싸지도록 반응형 가변 크기 유연 적용
+                displayElement.style.fontSize = "13vw";
+            } else {
+                // 표준 가치에 따른 초 올림 연산으로 자연스러운 카운트 연출
+                const displayTimeSec = timeLeftMs > 0 ? Math.ceil(timeLeftMs / 1000) : 0;
+                const minutes = Math.floor(displayTimeSec / 60);
+                const seconds = displayTimeSec % 60;
+                
+                const displayMin = String(minutes).padStart(2, '0');
+                const displaySec = String(seconds).padStart(2, '0');
+                
+                displayStr = `${displayMin}:${displaySec}`;
+                displayElement.style.fontSize = ""; // 기존 반응형 Tailwind(text-[12vw]~)로 자동 회귀
+            }
+            
+            displayElement.innerText = displayStr;
+            if (miniPreviewTimer) {
+                miniPreviewTimer.innerText = displayStr;
+            }
+
+            // 프로그레스 트랙 바 동적 제어
+            const progressPercent = totalDurationMs > 0 ? (timeLeftMs / totalDurationMs) * 100 : 0;
+            document.getElementById('progressBar').style.width = `${progressPercent}%`;
+
+            if (timeLeftMs <= 0 && isRunning) {
+                timeIsUp();
+            }
+        }
+
+        // 최상단 실시간 연동 시계 구동 및 미니 프리뷰 시계 연동
+        function startLiveClock() {
+            setInterval(() => {
+                const now = new Date();
+                const hrs = String(now.getHours()).padStart(2, '0');
+                const mins = String(now.getMinutes()).padStart(2, '0');
+                const secs = String(now.getSeconds()).padStart(2, '0');
+                const clockStr = `${hrs}:${mins}:${secs}`;
+                
+                document.getElementById('liveClock').innerText = clockStr;
+                
+                const miniPreviewClock = document.getElementById('miniPreviewClock');
+                if (miniPreviewClock) {
+                    miniPreviewClock.innerText = clockStr;
+                }
+            }, 1000);
+        }
+
+        // 고정밀 프레임 기반 업데이트 루프 틱 (Drift 최소화 및 10ms 단위 렌더링 최적화)
+        function timerTick() {
+            if (!isRunning) return;
+
+            const now = Date.now();
+            let remaining = targetTime - now;
+
+            if (remaining <= 0) {
+                remaining = 0;
+                timeLeftMs = 0;
+                updateTimerDisplay();
+                timeIsUp();
+                return;
+            }
+
+            timeLeftMs = remaining;
+            updateTimerDisplay();
+            
+            // 다음 프레임 대기 호출
+            timerFrameId = requestAnimationFrame(timerTick);
+        }
+
+        // 타이머 카운트다운 시작
+        function startTimer() {
+            if (isRunning) return;
+            
+            if (timeLeftMs <= 0) {
+                applyManualTime();
+            }
+
+            isRunning = true;
+            targetTime = Date.now() + timeLeftMs; // 목표 종료 시점 정확히 계산
+            
+            document.getElementById('pauseBadge').classList.add('hidden');
+            document.getElementById('startBtn').classList.add('opacity-50', 'cursor-not-allowed');
+
+            // 프레임 애니메이션 루프 가동
+            timerFrameId = requestAnimationFrame(timerTick);
+        }
+
+        // 타이머 동작 일시보류
+        function pauseTimer() {
+            if (!isRunning) return;
+            isRunning = false;
+            cancelAnimationFrame(timerFrameId); // 프레임 인터벌 클리어
+            
+            timeLeftMs = targetTime - Date.now();
+            if (timeLeftMs < 0) timeLeftMs = 0;
+
+            document.getElementById('pauseBadge').classList.remove('hidden');
+            document.getElementById('startBtn').classList.remove('opacity-50', 'cursor-not-allowed');
+            updateTimerDisplay();
+        }
+
+        // 타이머 초기 상태 리셋
+        function resetTimer() {
+            isRunning = false;
+            cancelAnimationFrame(timerFrameId);
+            clearInterval(alarmInterval);
+            
+            document.getElementById('pauseBadge').classList.add('hidden');
+            document.getElementById('startBtn').classList.remove('opacity-50', 'cursor-not-allowed');
+            
+            applyTheme(currentThemeIndex); // 테마 색상 복원
+            applyManualTime();             // 마지막 기입 수동 폼 수치로 타임 복귀
+        }
+
+        // 시간의 임의 가감 보조 연산 (+1분, -1분 등)
+        function adjustTime(amountSeconds) {
+            timeLeftMs += amountSeconds * 1000;
+            if (timeLeftMs < 0) timeLeftMs = 0;
+            
+            if (timeLeftMs > totalDurationMs) {
+                totalDurationMs = timeLeftMs;
+            }
+            
+            // 만약 현재 카운트 작동 중일 때는 목표 종료 일정도 즉각 연장 보정
+            if (isRunning) {
+                targetTime = Date.now() + timeLeftMs;
+            }
+            
+            updateTimerDisplay();
+        }
+
+        // 간편 퀵 프리셋 설정 (5분, 10분, 15분, 20분)
+        function setPresetTime(minutes) {
+            timeLeftMs = minutes * 60 * 1000;
+            totalDurationMs = timeLeftMs;
+            
+            document.getElementById('inputMin').value = minutes;
+            document.getElementById('inputSec').value = 0;
+
+            pauseTimer();
+            document.getElementById('pauseBadge').classList.add('hidden');
+            updateTimerDisplay();
+        }
+
+        // 세밀 설정값 직접 수동 기입 적용
+        function applyManualTime() {
+            const min = parseInt(document.getElementById('inputMin').value) || 0;
+            const sec = parseInt(document.getElementById('inputSec').value) || 0;
+            
+            timeLeftMs = ((min * 60) + sec) * 1000;
+            totalDurationMs = timeLeftMs;
+            
+            pauseTimer();
+            document.getElementById('pauseBadge').classList.add('hidden');
+            updateTimerDisplay();
+        }
+
+        /*
+         * ==========================================
+         * 7. 폰트 스타일러 및 정밀 옵션 제어
+         * ==========================================
+         */
+
+        // 폰트 셀렉트박스 변경 반영 인터렉션
+        function changeFont(index) {
+            currentFontIndex = parseInt(index);
+            const timerDisplay = document.getElementById('timerDisplay');
+            const miniPreviewTimer = document.getElementById('miniPreviewTimer');
+            
+            // 타이머에 기 탑재된 모든 전용 폰트 클래스 일괄 소거
+            fonts.forEach(f => {
+                timerDisplay.classList.remove(f.class);
+                if (miniPreviewTimer) miniPreviewTimer.classList.remove(f.class);
+            });
+            
+            // 선택된 신규 전용 폰트 스타일 부여
+            timerDisplay.classList.add(fonts[currentFontIndex].class);
+            if (miniPreviewTimer) {
+                miniPreviewTimer.classList.add(fonts[currentFontIndex].class);
+            }
+            
+            // 셀렉트 박스의 선택값 싱크 맞춤
+            document.getElementById('fontSelect').value = currentFontIndex;
+        }
+
+        // 소수점 0.00초 표시 버튼식 토글 스위치 제어
+        function toggleMillisecondsBtn() {
+            showMilliseconds = !showMilliseconds;
+            
+            const btn = document.getElementById('msToggleBtn');
+            const indicator = document.getElementById('msIndicator');
+            const text = document.getElementById('msToggleText');
+
+            if (showMilliseconds) {
+                // 활성화 시: 초록 테마 인디케이터 전환
+                indicator.className = "w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping";
+                text.innerText = "소수점 (0.00초) 활성 중";
+                btn.classList.add('border-emerald-500/40', 'bg-emerald-500/5');
+            } else {
+                // 비활성화 시: 장미빛 오프 상태 복조
+                indicator.className = "w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse";
+                text.innerText = "소수점 (0.00초) 활성화";
+                btn.classList.remove('border-emerald-500/40', 'bg-emerald-500/5');
+            }
+
+            // 디스플레이 구조 즉각 리프레시 반영
+            updateTimerDisplay();
+        }
+
+        /*
+         * ==========================================
+         * 8. 웹 사운드 합성 및 타임아웃 종료 경보
+         * ==========================================
+         */
+        function timeIsUp() {
+            isRunning = false;
+            cancelAnimationFrame(timerFrameId);
+            playHighChime();
+            
+            let isRed = false;
+            alarmInterval = setInterval(() => {
+                const timerDisplay = document.getElementById('timerDisplay');
+                if (isRed) {
+                    document.getElementById('bgGradient').style.background = `linear-gradient(to top right, ${themes[currentThemeIndex].gradFrom}, ${themes[currentThemeIndex].gradTo})`;
+                    timerDisplay.className = `text-[12vw] sm:text-[14vw] md:text-[16vw] font-extrabold tracking-tight leading-none transition-all duration-300 text-white ${fonts[currentFontIndex].class}`;
+                } else {
+                    document.getElementById('bgGradient').style.background = 'linear-gradient(to top right, #991b1b, #4c0519)'; // 극도의 각성을 유도하는 깊은 레드 그라디언트
+                    timerDisplay.className = `text-[12vw] sm:text-[14vw] md:text-[16vw] font-extrabold tracking-tight leading-none transition-all duration-300 text-rose-300 scale-105 ${fonts[currentFontIndex].class}`;
+                }
+                isRed = !isRed;
+            }, 500);
+
+            // 10초 후 깜빡임 연출 자동 정리
+            setTimeout(() => {
+                clearInterval(alarmInterval);
+                applyTheme(currentThemeIndex);
+            }, 10000);
+        }
+
+        // Web Audio API를 활용한 교육생 각성 웰컴 연주음 (네트워크 오프라인 무중단 지원)
+        function playHighChime() {
+            if (!isSoundOn) return;
+
+            try {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                const audioCtx = new AudioContext();
+
+                const triggerTone = (frequency, startTime, duration) => {
+                    const oscillator = audioCtx.createOscillator();
+                    const gainNode = audioCtx.createGain();
+
+                    oscillator.type = 'triangle'; // 빔프로젝터 스피커 찢어짐 없는 고요하고 밝은 기음
+                    oscillator.frequency.setValueAtTime(frequency, startTime);
+                    
+                    gainNode.gain.setValueAtTime(0, startTime);
+                    gainNode.gain.linearRampToValueAtTime(0.4, startTime + 0.05);
+                    gainNode.gain.exponentialRampToValueAtTime(0.001, startTime + duration - 0.05);
+
+                    oscillator.connect(gainNode);
+                    gainNode.connect(audioCtx.destination);
+
+                    oscillator.start(startTime);
+                    oscillator.stop(startTime + duration);
+                };
+
+                const now = audioCtx.currentTime;
+                // 평온하고 품격 있는 4계단 웰컴 종소리
+                triggerTone(523.25, now, 0.45);       // Do (C5)
+                triggerTone(659.25, now + 0.15, 0.45); // Mi (E5)
+                triggerTone(783.99, now + 0.3, 0.45);  // Sol (G5)
+                triggerTone(1046.50, now + 0.45, 1.3); // Do (C6)
+
+            } catch (error) {
+                console.log("웹 오디오 컨텍스트 구동 실패: 브라우저 인터렉션(클릭 등) 선행 필요", error);
+            }
+        }
+
+        // 음소거 온오프 버튼 분기 토글
+        function toggleSound() {
+            isSoundOn = !isSoundOn;
+            const icon = document.getElementById('soundIcon');
+            const btn = document.getElementById('soundBtn');
+            
+            if (isSoundOn) {
+                btn.className = "p-1.5 rounded bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 transition";
+                icon.innerHTML = `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"/>`;
+            } else {
+                btn.className = "p-1.5 rounded bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 transition";
+                icon.innerHTML = `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />`;
+            }
+        }
+
+        /*
+         * ==========================================
+         * 9. 디자인 스킨 테마 및 감성 배경 제어
+         * ==========================================
+         */
+
+        // 그라데이션 컬러 파레트 선택 버튼 드로잉
+        function renderThemeSelector() {
+            const container = document.getElementById('themeContainer');
+            container.innerHTML = '';
+            
+            themes.forEach((theme, index) => {
+                const btn = document.createElement('button');
+                btn.className = "relative h-10 w-full rounded-xl transition-all duration-300 active:scale-90 border border-white/10 flex items-center justify-center cursor-pointer overflow-hidden shadow-lg hover:border-white/30";
+                btn.style.background = `linear-gradient(135deg, ${theme.gradFrom}, ${theme.gradTo})`;
+                btn.title = theme.name;
+                
+                const innerCheck = document.createElement('div');
+                innerCheck.id = `themeCheck-${index}`;
+                innerCheck.className = "w-2.5 h-2.5 rounded-full bg-white opacity-0 transition-opacity duration-300";
+                
+                btn.appendChild(innerCheck);
+                btn.onclick = () => applyTheme(index);
+                container.appendChild(btn);
+            });
+        }
+
+        // 디자인 테마 일괄 렌더링 갱신
+        function applyTheme(index) {
+            currentThemeIndex = index;
+            const theme = themes[index];
+            
+            // 메인 화면 그라데이션 수정
+            document.getElementById('bgGradient').style.background = `linear-gradient(to top right, ${theme.gradFrom}, ${theme.gradTo})`;
+            document.getElementById('themeIndicator').style.backgroundColor = theme.indicatorColor;
+            document.getElementById('progressBar').style.backgroundColor = theme.indicatorColor;
+
+            // 타이머 숫자 컬러링과 폰트 클래스 유지
+            const timer = document.getElementById('timerDisplay');
+            timer.className = `text-[12vw] sm:text-[14vw] md:text-[16vw] font-extrabold tracking-tight leading-none transition-all duration-300 ${theme.fontColor} drop-shadow-[0_4px_12px_rgba(0,0,0,0.8)] ${fonts[currentFontIndex].class}`;
+            
+            // 동적 라벨 체크 처리
+            themes.forEach((_, tIdx) => {
+                const chk = document.getElementById(`themeCheck-${tIdx}`);
+                if (chk) {
+                    if (tIdx === index) {
+                        chk.classList.remove('opacity-0');
+                        chk.classList.add('opacity-100');
+                    } else {
+                        chk.classList.remove('opacity-100');
+                        chk.classList.add('opacity-0');
+                    }
+                }
+            });
+
+            // 상단 타이머 메인 가이드 텍스트 업데이트
+            const baseThemeText = selectedBgIndex !== -1 ? `${backgroundImages[selectedBgIndex].title} + ` : '';
+            const fullThemeName = `${baseThemeText}${theme.name}`;
+            document.getElementById('currentThemeName').innerText = fullThemeName;
+
+            // [신규]: 미니 프리뷰 정보 갱신
+            const miniPreviewGrad = document.getElementById('miniPreviewGrad');
+            if (miniPreviewGrad) {
+                miniPreviewGrad.style.background = `linear-gradient(to top right, ${theme.gradFrom}, ${theme.gradTo})`;
+            }
+            const miniPreviewThemeName = document.getElementById('miniPreviewThemeName');
+            if (miniPreviewThemeName) {
+                miniPreviewThemeName.innerText = fullThemeName;
+            }
+        }
+
+        // 10종 고화질 힐링 웹 이미지 샘플 그릿 컴포넌트 마운트
+        function renderBgImageSelector() {
+            const container = document.getElementById('bgImageSelectorContainer');
+            container.innerHTML = '';
+
+            backgroundImages.forEach((img, index) => {
+                const btn = document.createElement('button');
+                btn.className = "relative h-10 w-full rounded-xl transition-all duration-300 active:scale-90 border border-white/10 flex items-center justify-center cursor-pointer overflow-hidden shadow-lg hover:border-emerald-500/50";
+                btn.style.backgroundImage = `url('${img.thumbnail}')`;
+                btn.style.backgroundSize = 'cover';
+                btn.style.backgroundPosition = 'center';
+                btn.title = img.title;
+
+                const selectedMask = document.createElement('div');
+                selectedMask.id = `bgImgMask-${index}`;
+                selectedMask.className = "absolute inset-0 bg-emerald-500/30 opacity-0 transition-opacity duration-300 flex items-center justify-center";
+                
+                const checkDot = document.createElement('div');
+                checkDot.className = "w-2.5 h-2.5 rounded-full bg-white";
+                selectedMask.appendChild(checkDot);
+                
+                btn.appendChild(selectedMask);
+                btn.onclick = () => selectBackgroundImage(index);
+                container.appendChild(btn);
+            });
+        }
+
+        // 특정 고화질 배경 적용 및 미니 프리뷰 이미지 실시간 동기화
+        function selectBackgroundImage(index) {
+            selectedBgIndex = index;
+            const bgElement = document.getElementById('bgImage');
+            
+            // 메인 스크린 이미지 변경
+            bgElement.style.backgroundImage = `url('${backgroundImages[index].url}')`;
+            bgElement.style.opacity = "0.9";
+
+            // [신규]: 미니 프리뷰 카드 이미지 실시간 동기화
+            const miniPreviewCard = document.getElementById('miniPreviewCard');
+            if (miniPreviewCard) {
+                miniPreviewCard.style.backgroundImage = `url('${backgroundImages[index].url}')`;
+            }
+
+            backgroundImages.forEach((_, imgIdx) => {
+                const msk = document.getElementById(`bgImgMask-${imgIdx}`);
+                if (msk) {
+                    if (imgIdx === index) {
+                        msk.classList.remove('opacity-0');
+                        msk.classList.add('opacity-100');
+                    } else {
+                        msk.classList.remove('opacity-100');
+                        msk.classList.add('opacity-0');
+                    }
+                }
+            });
+
+            applyTheme(currentThemeIndex);
+        }
+
+        // 배경 레이어 클리어링 및 단일 그라데이션 컬러 환원
+        function clearBackgroundImage() {
+            selectedBgIndex = -1;
+            const bgElement = document.getElementById('bgImage');
+            bgElement.style.opacity = "0";
+
+            // [신규]: 미니 프리뷰 카드 이미지도 클리어링
+            const miniPreviewCard = document.getElementById('miniPreviewCard');
+            if (miniPreviewCard) {
+                miniPreviewCard.style.backgroundImage = 'none';
+            }
+
+            backgroundImages.forEach((_, imgIdx) => {
+                const msk = document.getElementById(`bgImgMask-${imgIdx}`);
+                if (msk) {
+                    msk.classList.remove('opacity-100');
+                    msk.classList.add('opacity-0');
+                }
+            });
+
+            applyTheme(currentThemeIndex);
+        }
+
+        /*
+         * ==========================================
+         * 10. [신규]: 안내 메시지 동적 추가/삭제/수정 시스템
+         * ==========================================
+         */
+
+        // 안내 메시지 프리셋 목록 드로잉
+        function renderMessagePresets() {
+            const container = document.getElementById('presetMessageContainer');
+            container.innerHTML = '';
+
+            messagePresets.forEach((presetText, index) => {
+                // 프리셋 항목 컨테이너 (마우스 호버 시 삭제 버튼 등장)
+                const wrapper = document.createElement('div');
+                wrapper.className = "flex items-center justify-between bg-white/5 hover:bg-white/10 p-2.5 rounded-lg gap-2 border border-white/5 group smooth-transition";
+
+                // 메시지 선택 클릭 버튼
+                const selectBtn = document.createElement('button');
+                selectBtn.className = "text-left text-xs text-white/80 truncate flex-grow cursor-pointer";
+                selectBtn.innerText = presetText;
+                selectBtn.title = "이 메시지를 화면에 송출";
+                selectBtn.onclick = () => selectMessagePreset(presetText);
+
+                // 프리셋 개별 삭제 버튼
+                const deleteBtn = document.createElement('button');
+                deleteBtn.className = "text-rose-400 hover:text-rose-300 text-xs px-2 py-1 opacity-0 group-hover:opacity-100 transition duration-200 whitespace-nowrap cursor-pointer hover:bg-rose-500/10 rounded";
+                deleteBtn.innerText = "삭제";
+                deleteBtn.title = "이 프리셋 영구 삭제";
+                deleteBtn.onclick = (e) => {
+                    e.stopPropagation(); // 버튼 이벤트 버블링 방지
+                    deletePreset(index);
+                };
+
+                wrapper.appendChild(selectBtn);
+                wrapper.appendChild(deleteBtn);
+                container.appendChild(wrapper);
+            });
+        }
+
+        // 신규 프리셋 등록 가동
+        function addNewPreset() {
+            const inputField = document.getElementById('inputMessage');
+            const newText = inputField.value.trim();
+
+            if (newText === "") {
+                return; // 빈 값 방어
+            }
+
+            // 이미 동일한 메시지가 존재하는지 여부 확인 후 등록
+            if (!messagePresets.includes(newText)) {
+                messagePresets.push(newText);
+                renderMessagePresets();
+            }
+        }
+
+        // 특정 인덱스의 프리셋 삭제
+        function deletePreset(index) {
+            messagePresets.splice(index, 1);
+            renderMessagePresets();
+        }
+
+        // 실시간 직접 지시 메시지 텍스트 렌더러 및 미니 프리뷰 동기화
+        function updateLiveMessage(value) {
+            const display = document.getElementById('messageDisplay');
+            const miniPreviewMsg = document.getElementById('miniPreviewMsg');
+            const defaultText = "잠시 휴식을 취한 후, 곧 다음 세션을 시작하겠습니다.";
+
+            if (value.trim() === "") {
+                display.innerText = defaultText;
+                if (miniPreviewMsg) miniPreviewMsg.innerText = defaultText;
+            } else {
+                display.innerText = value;
+                if (miniPreviewMsg) miniPreviewMsg.innerText = value;
+            }
+        }
+
+        // 프리셋 간편 메시지 로드 연동
+        function selectMessagePreset(text) {
+            document.getElementById('inputMessage').value = text;
+            updateLiveMessage(text);
+        }
+
+        /*
+         * ==========================================
+         * 11. 콘솔 제어창 숨기기/열기 (프로젝터 클린 전송 모드)
+         * ==========================================
+         */
+        function toggleControlPanel() {
+            const panel = document.getElementById('controlPanel');
+            const toggleIconEye = document.getElementById('toggleIconEye');
+            const toggleText = document.getElementById('toggleText');
+            
+            if (panel.classList.contains('hidden')) {
+                panel.classList.remove('hidden');
+                panel.classList.add('block');
+                toggleText.innerText = "설정 콘솔 숨기기";
+                toggleIconEye.innerHTML = `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>`;
+            } else {
+                panel.classList.remove('block');
+                panel.classList.add('hidden');
+                toggleText.innerText = "설정 콘솔 열기";
+                toggleIconEye.innerHTML = `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/>`;
+            }
+        }
+    </script>
+</body>
+</html>
